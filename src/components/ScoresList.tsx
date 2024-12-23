@@ -14,11 +14,13 @@ interface Match {
 interface ScoresListProps {
   matches: Match[];
   className?: string;
+  favorites?: string[];
+  onToggleFavorite?: (matchId: string) => void;
 }
 
-const ScoresList = ({ matches, className }: ScoresListProps) => {
+const ScoresList = ({ matches, className, favorites = [], onToggleFavorite }: ScoresListProps) => {
   return (
-    <div className={`space-y-3 ${className}`}>
+    <div className={`space-y-2 ${className}`}>
       {matches.map((match) => (
         <MatchCard
           key={match.id}
@@ -28,6 +30,8 @@ const ScoresList = ({ matches, className }: ScoresListProps) => {
           awayScore={match.awayScore}
           status={match.status}
           time={match.time}
+          isFavorite={favorites.includes(match.id)}
+          onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(match.id) : undefined}
         />
       ))}
     </div>
