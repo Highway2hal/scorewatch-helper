@@ -1,3 +1,13 @@
+interface Match {
+  id: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore?: number;
+  awayScore?: number;
+  status: 'upcoming' | 'live' | 'finished';
+  time?: string;
+}
+
 const CACHE_KEY = 'football-scores-cache';
 const FAVORITES_KEY = 'football-favorites';
 
