@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, Wifi, WifiOff } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { saveToCache, getFromCache, saveFavorites, getFavorites } from '@/utils/cache';
+import { useQuery } from '@tanstack/react-query';
+import { fetchMatches } from '@/services/footballApi';
 
 type ViewType = 'previous' | 'live' | 'upcoming';
 
@@ -13,54 +15,18 @@ const Index = () => {
   const [favorites, setFavorites] = useState<string[]>([]);
   const { toast } = useToast();
 
-  // Mock data - in a real app this would come from an API
-  const mockMatches = {
-    previous: [
-      {
-        id: '1',
-        homeTeam: 'Arsenal',
-        awayTeam: 'Chelsea',
-        homeScore: 2,
-        awayScore: 1,
-        status: 'finished' as const,
-      },
-      {
-        id: '2',
-        homeTeam: 'Liverpool',
-        awayTeam: 'Man City',
-        homeScore: 0,
-        awayScore: 0,
-        status: 'finished' as const,
-      },
-    ],
-    live: [
-      {
-        id: '3',
-        homeTeam: 'Man United',
-        awayTeam: 'Tottenham',
-        homeScore: 1,
-        awayScore: 1,
-        status: 'live' as const,
-        time: "45'"
-      },
-    ],
-    upcoming: [
-      {
-        id: '4',
-        homeTeam: 'Newcastle',
-        awayTeam: 'Brighton',
-        status: 'upcoming' as const,
-        time: '20:00',
-      },
-      {
-        id: '5',
-        homeTeam: 'Wolves',
-        awayTeam: 'Everton',
-        status: 'upcoming' as const,
-        time: '21:00',
-      },
-    ],
-  };
+  const { data: matches, error, isLoading } = useQuery({
+    queryKey: ['matches'],
+    queryFn: fetchMatches,
+    refetchInterval: currentView === 'live' ? 30000 : false, // Refresh every 30 seconds for live matches
+    onSuccess: (data) => {
+      // Save to cache for offline use
+      saveToCache({
+        matches: data,
+        lastUpdated: Date.now(),
+      });
+    },
+  });
 
   useEffect(() => {
     // Load favorites
@@ -87,26 +53,21 @@ const Index = () => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Save initial data to cache
-    saveToCache({
-      matches: mockMatches,
-      lastUpdated: Date.now(),
-    });
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, [toast]);
 
-  const getMatches = () => {
+  const getMatchesToDisplay = () => {
     if (isOffline) {
       const cached = getFromCache();
       if (cached) {
         return cached.matches[currentView];
       }
+      return [];
     }
-    return mockMatches[currentView];
+    return matches ? matches[currentView] : [];
   };
 
   const handleToggleFavorite = (matchId: string) => {
@@ -132,6 +93,22 @@ const Index = () => {
       setCurrentView(views[currentIndex + 1]);
     }
   };
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background p-2 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-destructive mb-2">Failed to load matches</p>
+          <Button 
+            variant="outline" 
+            onClick={() => window.location.reload()}
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-2">
@@ -166,12 +143,20 @@ const Index = () => {
         </Button>
       </div>
 
-      <ScoresList 
-        matches={getMatches()}
-        className="max-w-[180px] mx-auto"
-        favorites={favorites}
-        onToggleFavorite={handleToggleFavorite}
-      />
+      {isLoading ? (
+        <div className="flex justify-center items-center h-32">
+          <div className="animate-pulse text-sm text-muted-foreground">
+            Loading matches...
+          </div>
+        </div>
+      ) : (
+        <ScoresList 
+          matches={getMatchesToDisplay()}
+          className="max-w-[180px] mx-auto"
+          favorites={favorites}
+          onToggleFavorite={handleToggleFavorite}
+        />
+      )}
     </div>
   );
 };
